@@ -5,6 +5,7 @@
 //  Created by GitSwiftDev @ GitSwift LLC on 2024/12/6.
 //
 
+import Foundation
 import SwiftUI
 
 #if canImport(AppKit)
@@ -51,6 +52,10 @@ import SwiftUI
 
         public func setTerminalFontFamily(with family: String) {
             correspondingView.setTerminalFontFamily(with: family)
+        }
+
+        public func registerTerminalWebFont(family: String, fileURL: URL) {
+            correspondingView.registerTerminalWebFont(family: family, fileURL: fileURL)
         }
 
         public func setTerminalTheme(with theme: XTermTheme) {
@@ -111,6 +116,10 @@ import SwiftUI
 
         public func setTerminalFontFamily(with family: String) {
             correspondingView.setTerminalFontFamily(with: family)
+        }
+
+        public func registerTerminalWebFont(family: String, fileURL: URL) {
+            correspondingView.registerTerminalWebFont(family: family, fileURL: fileURL)
         }
 
         public func setTerminalTheme(with theme: XTermTheme) {

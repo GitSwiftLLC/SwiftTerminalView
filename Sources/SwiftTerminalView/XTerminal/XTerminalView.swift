@@ -60,6 +60,10 @@ import Foundation
             associatedCore.setTerminalFontFamily(with: family)
         }
 
+        public func registerTerminalWebFont(family: String, fileURL: URL) {
+            associatedCore.registerTerminalWebFont(family: family, fileURL: fileURL)
+        }
+
         public func setTerminalTheme(with theme: XTermTheme) {
             associatedCore.setTerminalTheme(with: theme)
         }
@@ -139,6 +143,10 @@ import Foundation
 
         public func setTerminalFontFamily(with family: String) {
             associatedCore.setTerminalFontFamily(with: family)
+        }
+
+        public func registerTerminalWebFont(family: String, fileURL: URL) {
+            associatedCore.registerTerminalWebFont(family: family, fileURL: fileURL)
         }
 
         public func setTerminalTheme(with theme: XTermTheme) {

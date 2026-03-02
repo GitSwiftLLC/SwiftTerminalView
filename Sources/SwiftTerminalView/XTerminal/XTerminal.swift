@@ -40,6 +40,8 @@ protocol XTerminal {
 
     func setTerminalFontFamily(with family: String)
 
+    func registerTerminalWebFont(family: String, fileURL: URL)
+
     func setTerminalTheme(with theme: XTermTheme)
 }
 @MainActor
@@ -48,6 +50,7 @@ class XTerminalCore: XTerminal {
     let associatedWebView: TransparentWebView
     let associatedWebDelegate: XTerminalWebViewDelegate
     let associatedScriptDelegate: XTerminalWebScriptHandler
+    let fontSchemeHandler = XTerminalFontSchemeHandler()
 
     init() {
         associatedWebDelegate = XTerminalWebViewDelegate()
@@ -63,6 +66,7 @@ class XTerminalCore: XTerminal {
         let contentController = WKUserContentController()
         contentController.add(associatedScriptDelegate, name: "callbackHandler")
         configuration.userContentController = contentController
+        configuration.setURLSchemeHandler(fontSchemeHandler, forURLScheme: XTerminalFontSchemeHandler.scheme)
         configuration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         associatedWebDelegate.userContentController = contentController
         associatedWebView = TransparentWebView(
@@ -192,13 +196,40 @@ class XTerminalCore: XTerminal {
 
     func setTerminalFontFamily(with family: String) {
         Task {
-            var family = family
-            if !family.contains(", monospace") {
-                family += ", monospace"
-            }
-            let script = "window.setTheme({fontFamily: '\(family)'})"
+            let script = "window.setTheme({fontFamily: \(javascriptStringLiteral(fontFamilyWithFallback(family)))})"
             let fit = "window.fit()"
             await self.associatedWebView.evaluateJavascriptWithRetry(javascript: script)
+            await self.associatedWebView.evaluateJavascriptWithRetry(javascript: fit)
+        }
+    }
+
+    func registerTerminalWebFont(family: String, fileURL: URL) {
+        Task {
+            let webURL = fontSchemeHandler.register(family: family, fileURL: fileURL)
+            let familyLiteral = javascriptStringLiteral(family)
+            let webURLLiteral = javascriptStringLiteral(webURL.absoluteString)
+            let injectFaceScript = """
+(() => {
+  const family = \(familyLiteral);
+  const fontURL = \(webURLLiteral);
+  const cssFamily = family.replace(/'/g, "\\\\'");
+  const cssURL = fontURL.replace(/'/g, "\\\\'");
+  const nodes = document.querySelectorAll("style[data-swiftterminal-font-family]");
+  for (const node of nodes) {
+    if (node.getAttribute("data-swiftterminal-font-family") === family) {
+      node.remove();
+    }
+  }
+  const style = document.createElement("style");
+  style.setAttribute("data-swiftterminal-font-family", family);
+  style.textContent = "@font-face { font-family: '" + cssFamily + "'; src: url('" + cssURL + "'); font-display: swap; }";
+  document.head.appendChild(style);
+})();
+"""
+            let setThemeScript = "window.setTheme({fontFamily: \(javascriptStringLiteral(fontFamilyWithFallback(family)))})"
+            let fit = "window.fit()"
+            await self.associatedWebView.evaluateJavascriptWithRetry(javascript: injectFaceScript)
+            await self.associatedWebView.evaluateJavascriptWithRetry(javascript: setThemeScript)
             await self.associatedWebView.evaluateJavascriptWithRetry(javascript: fit)
         }
     }
@@ -242,5 +273,23 @@ selectionBackground: '\(theme.selectionBackground)'}
         row = await self.associatedWebView.evaluateJavascriptWithRetryReturn(javascript: "term.rows")
         
         return CGSize(width: col, height: row)
+    }
+
+    private func fontFamilyWithFallback(_ family: String) -> String {
+        guard !family.contains(", monospace") else {
+            return family
+        }
+        return "\(family), monospace"
+    }
+
+    private func javascriptStringLiteral(_ value: String) -> String {
+        guard
+            let data = try? JSONSerialization.data(withJSONObject: [value], options: []),
+            let json = String(data: data, encoding: .utf8),
+            json.count >= 2
+        else {
+            return "\"\""
+        }
+        return String(json.dropFirst().dropLast())
     }
 }
